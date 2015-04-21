@@ -29,19 +29,20 @@ int main(int argc, char **argv)
 
 	// Buffer para intercambiar mensajes
 	char buffer[MAX_SIZE];
+	char buffer2[MAX_SIZE];
 
 //abrir cola de emparejamientos
-//mq_emp=mq_open(CLIENT_QUEUE, O_CREAT | O_RDONLY, 0644, &attr);
+mq_emp=mq_open(CLIENT_QUEUE, O_RDONLY);
 	// Abrir la cola del servidor
 	mq_server = mq_open(SERVER_QUEUE, O_WRONLY);
 	if(mq_server == (mqd_t)-1 ){
         	perror("Error al abrir la cola del servidor");
        		exit(-1);
 	}
-/*	if(mq_emp==(mqd_t)-1){
+if(mq_emp==(mqd_t)-1){
 		perror("Error al abrir la cola de emparejamiento");
 		exit(-1);
-	}*/
+	}
 
 	printf("Mandando mensajes al servidor (escribir \"%s\" para parar):\n", MSG_STOP);
 
@@ -61,8 +62,9 @@ int main(int argc, char **argv)
 		ssize_t bytes_read;
 
 		// Recibir el mensaje
-		bytes_read = mq_receive(mq_emp, buffer, MAX_SIZE, NULL);
+		bytes_read = mq_receive(mq_emp, buffer2, MAX_SIZE, NULL);
 		// Comprar que la recepción es correcta (bytes leidos no son negativos)
+		printf("\n%s",buffer2);
 		if(bytes_read < 0){
 			perror("Error al recibir el mensaje");
 			exit(-1);

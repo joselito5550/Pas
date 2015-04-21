@@ -88,7 +88,7 @@ while ((c = getopt_long (argc, argv, "a:r:enhx",
 	mq_server = mq_open(SERVER_QUEUE, O_CREAT | O_RDONLY, 0644, &attr);
 	//Crear la cola de mensajes de emparejamientos, de ESCRITURA!
 	//CLIENT_QUEUE??
-mq_emp = mq_open(SERVER_QUEUE, O_CREAT | O_WRONLY, 0644, &attr);
+mq_emp = mq_open(CLIENT_QUEUE, O_CREAT | O_WRONLY, 0644, &attr);
 
 	if(mq_server == (mqd_t)-1 ){
         	perror("Error al abrir la cola del servidor");
@@ -103,6 +103,13 @@ mq_emp = mq_open(SERVER_QUEUE, O_CREAT | O_WRONLY, 0644, &attr);
 	regex_t regex;
 	int reti;
 
+			//convertimos la expresion regular pasada como argumento
+			reti=regcomp(&regex,rvalue,0);
+			if (reti){
+				fprintf(stderr, "Could not compile regex\n");
+				mq_send(mq_emp,MSG_STOP, MAX_SIZE, 0);
+				exit(1);
+				}
 	do {
 		// Número de bytes leidos
 		ssize_t bytes_read;
@@ -118,9 +125,6 @@ mq_emp = mq_open(SERVER_QUEUE, O_CREAT | O_WRONLY, 0644, &attr);
 		// Cerrar la cadena
 		buffer[bytes_read] = '\0';
 		//----------------------------------------------------------------------------------------------------------------------
-			//convertimos la expresion regular pasada como argumento
-			reti=regcomp(&regex,rvalue,0);
-			if (reti){ fprintf(stderr, "Could not compile regex\n"); exit(1); }
 
 			//la comprobamos con el mensaje recibido
 			reti=regexec(&regex,&buffer,0,NULL,0);
@@ -133,7 +137,7 @@ mq_emp = mq_open(SERVER_QUEUE, O_CREAT | O_WRONLY, 0644, &attr);
 			}
 			else if(reti==REG_NOMATCH){
 				printf("\nNo match");
-				if(mq_send(mq_emp,"Match", MAX_SIZE, 0) != 0){
+				if(mq_send(mq_emp,"No Match", MAX_SIZE, 0) != 0){
 					perror("Error al enviar el mensaje");
 					exit(-1);
 				}
