@@ -17,16 +17,31 @@ int main(int argc, char **argv)
 {
 	// Cola del servidor
 	mqd_t mq_server;
+
+	//Cola para enviar mensaje de emparejamiento
+	mqd_t mq_emp;
+
+	//atributos de la cola
+	struct mq_attr attr;
+
+	attr.mq_maxmsg = 10;        // Maximo número de mensajes
+	attr.mq_msgsize = MAX_SIZE; // Maximo tamaño de un mensaje
+
 	// Buffer para intercambiar mensajes
 	char buffer[MAX_SIZE];
 
-
+//abrir cola de emparejamientos
+//mq_emp=mq_open(CLIENT_QUEUE, O_CREAT | O_RDONLY, 0644, &attr);
 	// Abrir la cola del servidor
 	mq_server = mq_open(SERVER_QUEUE, O_WRONLY);
 	if(mq_server == (mqd_t)-1 ){
         	perror("Error al abrir la cola del servidor");
        		exit(-1);
 	}
+/*	if(mq_emp==(mqd_t)-1){
+		perror("Error al abrir la cola de emparejamiento");
+		exit(-1);
+	}*/
 
 	printf("Mandando mensajes al servidor (escribir \"%s\" para parar):\n", MSG_STOP);
 
@@ -43,6 +58,15 @@ int main(int argc, char **argv)
 			perror("Error al enviar el mensaje");
 			exit(-1);
 		}
+		ssize_t bytes_read;
+
+		// Recibir el mensaje
+		bytes_read = mq_receive(mq_emp, buffer, MAX_SIZE, NULL);
+		// Comprar que la recepción es correcta (bytes leidos no son negativos)
+		if(bytes_read < 0){
+			perror("Error al recibir el mensaje");
+			exit(-1);
+		}
 
 	// Iterar hasta escribir el código de salida
 	} while (strncmp(buffer, MSG_STOP, strlen(MSG_STOP)));
@@ -50,6 +74,17 @@ int main(int argc, char **argv)
 	// Cerrar la cola del servidor
 	if(mq_close(mq_server) == (mqd_t)-1){
 		perror("Error al cerrar la cola del servidor");
+		exit(-1);
+	}
+
+	//cerrar la cola de emparejamiento
+	if(mq_close(mq_emp)==(mqd_t)-1){
+		perror("Error al cerrar la cola de emparejamiento");
+		exit(-1);
+	}
+
+	if(mq_unlink(CLIENT_QUEUE) == (mqd_t)-1){
+		perror("Error al eliminar la cola del servidor");
 		exit(-1);
 	}
 

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <regex.h>
 #include <mqueue.h>
 #include <time.h>
 #include <errno.h>
@@ -65,11 +66,11 @@ while ((c = getopt_long (argc, argv, "a:r:enhx",
 											break;
 											case 'h':
 											printf("\n-r  --regex \t introducir la expresion regular\n-e --ere \t expresion regular de tipo ere\n-h --help \t ayuda (pagina actual)");
-											exit 0;
+											exit (0);
 											break;
 											case 'x':
 											printf("\n-r  --regex \t introducir la expresion regular\n-e --ere \t expresion regular de tipo ere\n-h --help \t ayuda (pagina actual)");
-											exit 0;
+											exit (0);
 											break;
 										}
 									}
@@ -87,13 +88,21 @@ while ((c = getopt_long (argc, argv, "a:r:enhx",
 	mq_server = mq_open(SERVER_QUEUE, O_CREAT | O_RDONLY, 0644, &attr);
 	//Crear la cola de mensajes de emparejamientos, de ESCRITURA!
 	//CLIENT_QUEUE??
-mq_emp = mq_open(CLIENT_QUEUE, O_WRONLY);
+mq_emp = mq_open(SERVER_QUEUE, O_CREAT | O_WRONLY, 0644, &attr);
 
 	if(mq_server == (mqd_t)-1 ){
         	perror("Error al abrir la cola del servidor");
        		exit(-1);
 	}
+	if(mq_emp==(mqd_t)-1){
+		perror("Error al abrir la cola de emparejamiento");
+		exit(-1);
+	}
 	umask(oldMask);
+
+	regex_t regex;
+	int reti;
+
 	do {
 		// Número de bytes leidos
 		ssize_t bytes_read;
@@ -108,20 +117,53 @@ mq_emp = mq_open(CLIENT_QUEUE, O_WRONLY);
 
 		// Cerrar la cadena
 		buffer[bytes_read] = '\0';
+		//----------------------------------------------------------------------------------------------------------------------
+			//convertimos la expresion regular pasada como argumento
+			reti=regcomp(&regex,rvalue,0);
+			if (reti){ fprintf(stderr, "Could not compile regex\n"); exit(1); }
+
+			//la comprobamos con el mensaje recibido
+			reti=regexec(&regex,&buffer,0,NULL,0);
+			if(!reti){
+				printf("\nmatch");
+				if(mq_send(mq_emp,"Match", MAX_SIZE, 0) != 0){
+					perror("Error al enviar el mensaje");
+					exit(-1);
+				}
+			}
+			else if(reti==REG_NOMATCH){
+				printf("\nNo match");
+				if(mq_send(mq_emp,"Match", MAX_SIZE, 0) != 0){
+					perror("Error al enviar el mensaje");
+					exit(-1);
+				}
+			}
+
+			//----------------------------------------------------------------------------------------------------------------------
 
 		// Comprobar el fin del bucle
 		if (strncmp(buffer, MSG_STOP, strlen(MSG_STOP))==0)
 			must_stop = 1;
 		else
 			printf("Recibido el mensaje: %s\n", buffer);
+
 	// Iterar hasta que llegue el código de salida
 	} while (!must_stop);
+
+
+
 
 	// Cerrar la cola del servidor
 	if(mq_close(mq_server) == (mqd_t)-1){
 		perror("Error al cerrar la cola del servidor");
 		exit(-1);
 	}
+
+//cerrar la cola de emparejamiento
+if(mq_close(mq_emp)==(mqd_t)-1){
+	perror("Error al cerrar la cola de emparejamiento");
+	exit(-1);
+}
 
 	// Eliminar la cola del servidor
 	if(mq_unlink(SERVER_QUEUE) == (mqd_t)-1){
